@@ -213,3 +213,56 @@ avg_latest_score AS (
 SELECT AVG(credit_score) FROM latest_score WHERE rn = 1
 )
 SELECT user_id, city, credit_score FROM latest_score WHERE rn = 1 AND credit_score > (SELECT * FROM avg_latest_score);
+
+--Join execution mechanics
+--A join takes two tables and pairs up rows whose key value matches.
+--Every join type is the same pairing step. The only difference is what happens to rows that have no match
+--INNER - Drops unmatched rows from both sides
+--LEFT - Keeps every left row and fills the right column with NULL when there is no match
+--FULL OUTER - Keeps unmatched rows from both sides
+--CROSS - No matching happens so every left row pairs with every right row
+
+--Duplicate keys multiply rows - If a key appears 2 times on left and 3 times on the right, then join gives 2*3 = 6 rows for that key
+--Null never matches anything not even another null
+--Database picks a method to perform join
+--Nested join (For each left row, search the right)
+--Hash join (Build a lookup table from the smaller side)
+--Merge join (Sort both sides, then walk them together)
+
+CREATE TABLE customers (customer_id INT, name VARCHAR(20));
+INSERT INTO customers VALUES
+  (1,'Asha'),(2,'Ravi'),(3,'Meera'),(4,'Karan'),(5,'Divya');
+
+CREATE TABLE loans (loan_id INT, customer_id INT, amount INT);
+INSERT INTO loans VALUES
+  (101,1,50000),(102,1,30000),(103,2,80000),
+  (104,4,20000),(105,6,45000),(106,NULL,10000);
+
+SELECT * FROM customers;
+SELECT * FROM loans;
+
+--For inner - 4
+SELECT * FROM loans l INNER JOIN customers c ON l.customer_id = c.customer_id;
+--For left - 6
+SELECT * FROM customers c LEFT JOIN loans l ON l.customer_id = c.customer_id;
+SELECT * FROM customers c FULL OUTER JOIN loans l ON l.customer_id = c.customer_id;
+--Cartesian product
+SELECT * FROM customers c CROSS JOIN loans l;
+
+--Customers with no loans
+SELECT * FROM customers c LEFT JOIN loans l ON c.customer_id = l.customer_id WHERE l.loan_id IS NULL;
+
+--Loans with no matching customers
+SELECT * FROM loans l LEFT JOIN customers c ON l.customer_id = c.customer_id WHERE c.customer_id IS NULL;
+
+--Creating a duplicate key problem
+INSERT INTO customers VALUES (1,'Asha');
+SELECT * FROM customers;
+
+SELECT COUNT(*), SUM(l.amount) FROM loans l INNER JOIN customers c ON l.customer_id = c.customer_id;
+
+--Removing duplicate keys risk by using CTE
+WITH unique_customer AS (
+SELECT customer_id, name, ROW_NUMBER() OVER (PARTITION BY customer_id) AS rn FROM customers
+)
+SELECT COUNT(*), SUM(l.amount) FROM loans l INNER JOIN unique_customer u ON l.customer_id = u.customer_id WHERE rn = 1;
