@@ -266,3 +266,64 @@ WITH unique_customer AS (
 SELECT customer_id, name, ROW_NUMBER() OVER (PARTITION BY customer_id) AS rn FROM customers
 )
 SELECT COUNT(*), SUM(l.amount) FROM loans l INNER JOIN unique_customer u ON l.customer_id = u.customer_id WHERE rn = 1;
+
+--NULL means unknown or missing. It isn’t 0, and it isn’t an empty string
+--SQL can’t say whether an unknown equals anything, comparisons with NULL give “unknown”\
+--Where and ON keep only rows where the result is true.
+--Comparisons skip NULL rows.
+--Aggregates skip NULLs.
+--Replacing NULLs changes the answer.
+
+--Functions to return a replacement of null
+--COALESCE(a, b, c) returns the first non-NULL value
+
+CREATE TABLE applicants (applicant_id INT, name VARCHAR(20), mobile VARCHAR(12),
+  city VARCHAR(20), income INT, credit_score INT);
+INSERT INTO applicants VALUES
+  (1,'Asha','9820011111','Mumbai',60000,720),
+  (2,'Ravi',NULL,'Pune',45000,NULL),
+  (3,'Meera','9820033333',NULL,NULL,690),
+  (4,'Karan',NULL,NULL,52000,745),
+  (5,'Divya','9820055555','Mumbai',NULL,NULL),
+  (6,'Neel','9820066666','Delhi',70000,780),
+  (7,'Zoya','','Goa',40000,710);
+
+ SELECT * FROM applicants;
+
+ SELECT COUNT(*) FROM applicants;
+ SELECT COUNT(applicant_id), COUNT(name), COUNT(mobile), COUNT(city), COUNT(income), COUNT(credit_score) FROM applicants;
+
+ SELECT AVG(income) FROM applicants;
+ --53400.000000000000
+
+ SELECT AVG(COALESCE(income, 0)) FROM applicants;
+ --38142.857142857143
+
+ SELECT * FROM applicants WHERE city <> 'Mumbai' 
+ SELECT * FROM applicants WHERE city = 'Mumbai'
+
+ SELECT *,
+ 	CASE WHEN mobile IS NOT NULL AND city IS NOT NULL AND income IS NOT NULL AND credit_Score IS NOT NULL THEN 'Complete'
+ 	ELSE 'Incomplete'
+	END AS account_complete
+FROM applicants;
+
+UPDATE applicants SET mobile = NULLIF(mobile, '');
+
+ SELECT *,
+ 	CASE WHEN mobile IS NOT NULL AND city IS NOT NULL AND income IS NOT NULL AND credit_Score IS NOT NULL THEN 'Complete'
+ 	ELSE 'Incomplete'
+	END AS account_complete
+FROM applicants;
+
+CREATE TABLE blocked_cities (city VARCHAR(20));
+INSERT INTO blocked_cities VALUES ('Pune'), (NULL);
+
+SELECT * FROM applicants
+WHERE city NOT IN (SELECT city FROM blocked_cities);
+
+SELECT * FROM applicants a
+WHERE NOT EXISTS (
+    SELECT 1 FROM blocked_cities b
+);
+ 
