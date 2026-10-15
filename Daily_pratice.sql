@@ -326,4 +326,60 @@ SELECT * FROM applicants a
 WHERE NOT EXISTS (
     SELECT 1 FROM blocked_cities b
 );
- 
+
+
+--Query optimization
+--A query is slow because it reads too much
+--read fewer rows
+--read fewer columns
+--do less work after reading
+--EXPLAIN shows how the database will run your query without running it
+--EXPLAIN ANALYZE runs it and shows actual time and row counts
+--There are 2 types of scans - Seq scan and Index scan
+--Seq scan reads every row of the table which is full scan
+--Index scan lets the database to jump to the matching rows.
+--SELECT * hurts big data
+--Parquet and Delta store data column by column
+
+CREATE TABLE txn_big AS
+SELECT g AS txn_id,
+       (g % 5000) + 1 AS account_id,
+       DATE '2026-01-01' + (g % 300) AS txn_date,
+       (random()*10000)::numeric(10,2) AS amount,
+       md5(g::text) AS note
+FROM generate_series(1,1000000) g;
+
+EXPLAIN SELECT * FROM txn_big WHERE account_id = 42;
+
+EXPLAIN ANALYZE SELECT * FROM txn_big WHERE account_id = 42;
+
+--Creating index on account id
+CREATE INDEX idx_account ON txn_big(account_id);
+
+ANALYZE txn_big;
+
+EXPLAIN SELECT * FROM txn_big WHERE account_id < 4000;
+
+EXPLAIN ANALYZE SELECT * FROM txn_big WHERE account_id < 4000;
+
+--creating index on txn_Date
+CREATE INDEX idx_txn_date ON txn_big(txn_date);
+
+ANALYZE txn_big;
+
+--A filter that can use an index is called sargable.
+
+-- A: function on the column
+EXPLAIN ANALYZE SELECT * FROM txn_big WHERE txn_date::text = '2026-03-01';
+-- B: bare column
+EXPLAIN ANALYZE SELECT * FROM txn_big WHERE txn_date = '2026-03-01';
+
+EXPLAIN ANALYZE SELECT * FROM txn_big WHERE account_id < 4000;
+--scan type - Seq scan
+--width - 51
+--Execution time - 126.486 ms
+
+EXPLAIN ANALYZE SELECT account_id, amount FROM txn_big WHERE account_id < 4000;
+--Seq scan
+--Width - 10
+--Execution time -142.701 ms 
